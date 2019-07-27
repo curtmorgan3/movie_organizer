@@ -4,12 +4,23 @@ const fs = require('fs')
 const chalk = require('chalk')
 
 
-const moviesStorePath = '/Users/curtmorgan/documents/apps/_side_work/movie_organizer/movies/';
-const genresPath = '/Users/curtmorgan/documents/apps/_side_work/movie_organizer/genres/';
+// const moviesStorePath = "C:/Users/Curt/Documents/apps/movie_organizer/movies/";
+// const genresPath = 'C:/Users/Curt/Documents/apps/movie_organizer/genres/';
+
+const moviesStorePath = "E:/Movies/Action & Adventure/";
+const genresPath = "C:/Users/Curt/Desktop/movies/"
 
 
 const searchMovieGenre = async (movieTitle) => {
 	let movieQueryString = movieTitle.replace(' ', '+');
+	let extensions = ['.avi', '.mp4', '.m4v', '.wmv', '.mkv', '.flv', '.mov', '720p', '1080p', '.vsmeta'];
+	extensions.forEach(type => {
+		if(movieQueryString.includes(type)){
+			movieQueryString = movieQueryString.replace(type, '');
+			movieTitle = movieTitle.replace(type, '');
+		}
+	});
+
 	const url = `https://www.imdb.com/find?ref_=nv_sr_fn&q=${movieQueryString}&s=all`
 
   try {
@@ -17,6 +28,10 @@ const searchMovieGenre = async (movieTitle) => {
     let $ = cheerio.load(response.data);
 
 		let firstResult = $('td[class=result_text]').html();
+		if(!firstResult){
+			console.log(chalk.white.bgRed(`Cannot find genre for ${movieTitle}`))
+			return null;
+		}
 		firstResult = firstResult.split("\"");
 		let moviePath = firstResult[1];
 
@@ -43,40 +58,31 @@ const init = async () => {
 	// Blocking
 	fs.readdirSync(moviesStorePath).map( async title => {
 		let genres = await searchMovieGenre(title);
-		console.log(title + ': ' + genres);
-		genres.forEach(genre => {
-			let dirName = genre.toLowerCase().replace(' ', '');
-			try{
-				fs.accessSync(`${genresPath}${dirName}`);
-				console.log(`Adding ${title} to ${dirName} directory...`);
-				fs.symlinkSync(`${moviesStorePath}${title}`, `${genresPath}${dirName}/${title}`);
-			}catch(err){
-				console.log(`${dirName} directory doesn't exist. Creating...`);
-				fs.mkdirSync(`${genresPath}${dirName}`, error => console.log(error));
-				console.log(`Adding ${title} to ${dirName} directory...`);
-				fs.symlinkSync(`${moviesStorePath}${title}`, `${genresPath}${dirName}/${title}`);
-			}
-		})
+		if(genres !== null){
+			console.log(title + ': ' + genres);
+			genres.forEach(genre => {
+				let dirName = genre.toLowerCase().replace(' ', '');
+				try{
+					fs.accessSync(`${genresPath}${dirName}`);
+					try{
+						fs.symlinkSync(`${moviesStorePath}${title}`, `${genresPath}${dirName}/${title}`);
+						console.log(chalk.green(`Adding ${title} to ${dirName} directory...`));
+					}catch (err){
+						console.log(chalk.white.bgRed(`${title} is already present in ${dirName} directory.`));
+					}
+				}catch(err){
+					console.log(chalk.red(`${dirName} directory doesn't exist. Creating...`));
+					fs.mkdirSync(`${genresPath}${dirName}`, error => console.log(error));
+					console.log(chalk.green(`Adding ${title} to ${dirName} directory...`));
+					try{
+						fs.symlinkSync(`${moviesStorePath}${title}`, `${genresPath}${dirName}/${title}`);
+					}catch (err){
+						console.log(chalk.white.bgRed(err));
+					}
+				}
+			})
+		}
 	});
-
-	//Non-Blocking
-	// fs.readdir(moviesDir, (err, files) => {
-	// 	files.map(async movie => {
-	// 		let genres = await searchMovieGenre(movie);
-	// 		console.log(movie + ': ' + genres);
-	// 		genres.forEach(genre => {
-	// 			let fileName = genre.toLowerCase().replace(' ', '');
-	// 			fs.access(`${genresDir}/${fileName}`, error => {
-  //   			if (!error) {
-  //       	console.log(`genre ${fileName} exists`);
-  //   			} else {
-	// 				console.log(`genre ${fileName} doesn't exist`);
-	// 				fs.mkdir(`${genresDir}/${fileName}`, err => console.error(err));
-  //   			}
-	// 			});
-	// 		})
-	// 	});
-	// });
 }
 
 init();
